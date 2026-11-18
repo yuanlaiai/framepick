@@ -1,0 +1,38 @@
+name: Bug 报告
+description: 解析失败、转写异常、界面问题
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请尽量提供可复现的信息。**请勿粘贴完整 cookies、私人链接或未脱敏的手机号。**
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么
+      description: 预期结果 vs 实际结果
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: 链接类型
+      placeholder: 例如：抖音视频链接（可脱敏，保留域名与路径格式）
+  - type: textarea
+    id: logs
+    attributes:
+      label: 错误信息 / 日志
+      description: 页面提示、浏览器控制台或终端日志
+      render: shell
+  - type: input
+    id: env
+    attributes:
+      label: 运行环境
+      placeholder: macOS 15 / Python 3.13 / Chrome 140 / 模型 small
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 确认
+      options:
+        - label: 我已经搜索过现有 Issues
+        - label: 我使用的是最新代码，且已安装 Chrome 与 ffmpeg

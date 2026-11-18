@@ -1,0 +1,16 @@
+[project]
+name = "framepick"
+version = "1.0.0"
+description = "One link, all assets: video, audio, cover and transcript, extracted locally."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "FramePick contributors" }]
+keywords = ["video", "whisper", "transcript", "douyin", "xiaohongshu", "yt-dlp"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "W"]
