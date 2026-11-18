@@ -164,6 +164,7 @@ async def upload_task(
         )
     config.UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     dest = config.UPLOADS_DIR / f"{uuid.uuid4().hex}{suffix}"
+    # 流式写盘并累计大小，避免把大文件整个读进内存，也防止超出上限
     total = 0
     try:
         with dest.open("wb") as fh:
@@ -301,6 +302,11 @@ def _content_disposition(disposition: str, filename: str) -> str:
 
 @app.get("/api/tasks/{task_id}/asset/{kind}")
 def download_asset(task_id: str, kind: str, download: bool = False) -> FileResponse:
+    """素材下载。
+
+    不加 download 时返回 inline，供 <video>/<audio> 直接播放（支持 Range）；
+    加 ?download=1 才用 attachment，避免点击卡片时浏览器直接打开播放器。
+    """
     task, _result = _get_done_result(task_id)
     if kind not in ("video", "audio", "cover"):
         raise HTTPException(404, detail={"message": "未知素材类型", "hint": "可选：video / audio / cover"})
@@ -316,6 +322,7 @@ def download_asset(task_id: str, kind: str, download: bool = False) -> FileRespo
 
 @app.get("/api/tasks/{task_id}/package")
 def download_package(task_id: str) -> FileResponse:
+    """打包：视频 + 音频 + 封面 + 文案 + SRT + 信息表，一次性下载。"""
     task, result = _get_done_result(task_id)
     assets = result.get("assets") or {}
     base = _safe_filename(result["source"].get("title") or "视频素材")
@@ -355,4 +362,6 @@ def download_package(task_id: str) -> FileResponse:
     )
 
 config.STATIC_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/", StaticFiles(directory=str(config.STATIC_DIR), html=True), name="static")
+if not (config.STATIC_DIR / "index.html").exists():
+    log.warning("前端尚未构建：请执行 cd web && npm install && npm run build")
+app.mount("/", StaticFiles(directory=str(config.STATIC_DIR), html=True), name="web")

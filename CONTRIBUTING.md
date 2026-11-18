@@ -34,7 +34,8 @@ pip install ruff
 | `app/subtitles.py` | 平台字幕下载与 VTT / SRT / JSON3 解析 |
 | `app/textproc.py` | 标点、断句、分段与导出格式 |
 | `app/platforms.py` | 链接识别与平台判断 |
-| `static/` | 无构建步骤的前端 |
+| `web/src/` | React 组件、hooks、API 封装 |
+| `web/dist/` | 前端构建产物（已提交，FastAPI 直接托管） |
 
 ## 新增一个平台
 
@@ -46,11 +47,25 @@ pip install ruff
 4. 在 `app/pipeline.py` 的 `fetch_info` 中接入。
 5. 本地跑完整链路：解析 → 视频/音频/封面 → 转写 → 导出。
 
+## 前端开发
+
+```bash
+cd web
+npm install
+npm run dev     # 5173 端口，/api 代理到 8790
+npm run build   # 产出 web/dist
+```
+
+- 组件按区块拆分：`Extractor`（输入）、`ProgressPanel`、`ResultPanel`（结果）等；
+- 任务轮询集中在 `hooks/useExtraction.ts`，组件只消费状态；
+- 样式一律用 Tailwind 原子类，复杂复用样式写在 `src/index.css` 的组件层；
+- 改完前端记得 `npm run build`，否则 `web/dist` 不会更新。
+
 ## 代码风格
 
 - Python 3.10+，使用类型标注；逻辑尽量拆小函数，错误信息面向用户、用中文。
 - 运行 `ruff check app`（配置见 `pyproject.toml`）。
-- 前端保持零构建：原生 HTML/CSS/JS，不引入打包器。
+- 前端使用 React + TypeScript + Tailwind，类型需与 `web/src/types.ts` 对齐；新增依赖前请先讨论。
 - 不要提交 `data/`、模型文件、cookies、测试素材。
 
 ## 提交前自测

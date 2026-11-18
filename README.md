@@ -16,6 +16,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-6366f1?style=flat-square" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-3b82f6?style=flat-square" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square" alt="FastAPI">
+  <img src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=white" alt="React 19">
+  <img src="https://img.shields.io/badge/Tailwind-4-38bdf8?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 4">
   <img src="https://img.shields.io/badge/Whisper-faster--whisper-8b5cf6?style=flat-square" alt="faster-whisper">
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey?style=flat-square" alt="macOS / Linux">
   <img src="https://img.shields.io/badge/PRs-welcome-ec4899?style=flat-square" alt="PRs welcome">
@@ -61,6 +63,15 @@
 - **可选 Cookies**：遇到平台风控、1080P 权限限制时，导入浏览器 cookies 即可。
 - **本地优先**：只监听 `127.0.0.1`，素材写入 `data/`，删除任务即清理缓存。
 
+## 技术栈
+
+| 层 | 选型 |
+| --- | --- |
+| 后端 | Python 3.10+ · FastAPI · yt-dlp · ffmpeg · faster-whisper |
+| 免登录解析 | Playwright + 本机 Chrome（抖音 / 小红书） |
+| 前端 | React 19 · TypeScript · Vite 8 · Tailwind CSS 4 |
+| 存储 | 本地 `data/`（任务 JSON + 素材文件），无数据库 |
+
 | 暗色 | 移动端 |
 | --- | --- |
 | ![暗色界面](docs/screenshot-dark.png) | ![移动端界面](docs/screenshot-mobile.png) |
@@ -81,6 +92,15 @@ pip install -r requirements.txt
 
 # 3. 启动
 ./run.sh                            # 默认 http://127.0.0.1:8790
+```
+
+仓库已包含构建好的 `web/dist`，所以启动不需要 Node。改前端时再进 `web/`：
+
+```bash
+cd web
+npm install
+npm run dev      # http://127.0.0.1:5173，/api 自动代理到 8790
+npm run build    # 产出到 web/dist，FastAPI 直接托管
 ```
 
 macOS 安装 ffmpeg：
@@ -165,7 +185,15 @@ framepick/
 │   ├── textproc.py    # 标点、断句、分段、导出格式
 │   ├── platforms.py   # 链接识别与平台判断
 │   └── config.py      # 路径、模型、清晰度等配置
-├── static/            # 无构建步骤的前端（HTML/CSS/JS）
+├── web/               # React 前端
+│   ├── src/
+│   │   ├── components/  # 页面区块与素材/播放器组件
+│   │   ├── hooks/       # 主题、Toast、任务轮询状态机
+│   │   ├── lib/         # API 封装、格式化、剪贴板
+│   │   ├── types.ts     # 与后端 API 对齐的类型
+│   │   └── App.tsx
+│   ├── public/          # logo 等静态资源
+│   └── dist/            # 构建产物（已提交，FastAPI 托管）
 ├── docs/              # Logo 与截图
 ├── data/              # 运行数据（素材、任务结果、cookies）
 ├── run.sh
@@ -239,6 +267,9 @@ curl -X POST http://127.0.0.1:8790/api/tasks \
 
 **磁盘占用太大？**
 素材保存在 `data/assets/<任务 id>/`，删除对应记录即可一并清理。
+
+**改了前端代码但页面没变化？**
+前端不是热更新到 8790 的：开发时用 `cd web && npm run dev`（5173 端口，带代理）；改完要发布就 `npm run build`，然后刷新 8790。
 
 **支持 Windows 吗？**
 代码未针对 Windows 做适配与测试，理论上可用（需要 ffmpeg 与 Chrome），欢迎提交 PR。

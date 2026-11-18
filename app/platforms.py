@@ -25,7 +25,11 @@ PLATFORM_RULES: list[tuple[re.Pattern[str], str, str]] = [
 
 
 def extract_url(text: str) -> str | None:
-    """从一段分享文案里找出第一个 http(s) 链接。"""
+    """从一段分享文案里找出第一个 http(s) 链接。
+
+    抖音/B站的分享文本通常是「复制打开抖音… https://v.douyin.com/xxx/ …」，
+    这里允许中文与标点混杂，并去掉结尾的全角标点。
+    """
     if not text:
         return None
     text = text.strip()
@@ -38,6 +42,7 @@ def extract_url(text: str) -> str | None:
 
 
 def detect_platform(url: str) -> tuple[str, str]:
+    """按域名判断平台；匹配不到时返回通用链接，交给 yt-dlp 尝试。"""
     try:
         host = (urlparse(url).hostname or "").lower()
     except ValueError:

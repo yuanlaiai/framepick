@@ -133,6 +133,7 @@ def fetch_info(url: str, retry_with_proxy: bool = True) -> dict:
 
 
 def _pick_source(info: dict, url: str, platform_key: str, platform_label: str) -> dict:
+    """把 yt-dlp / 自研解析器的 info 归一化成前端需要的 source 结构。"""
     label = info.get("platform_label") or platform_label
     platform_key = info.get("platform") or platform_key
     ext_label = platforms.EXTRACTOR_LABELS.get(info.get("extractor_key", ""))
@@ -184,6 +185,7 @@ def _trim_segments(segments: list[dict], duration: float) -> list[dict]:
 
 
 def _download_with_retry(opts: dict, url: str, *, stage: str, emit: Emit, cancel_check: Callable[[], bool]) -> None:
+    """直连失败时依次尝试系统代理、再重试直连；用户取消立即抛出 Cancelled。"""
     def attempt(extra: dict) -> None:
         merged = dict(opts)
         merged.update(extra)
@@ -227,6 +229,7 @@ def _download_direct(
     emit: Emit,
     cancel_check: Callable[[], bool],
 ) -> Path:
+    """下载解析器给出的直链（抖音/小红书）。直链有时效，必须拿到后立即使用。"""
     req = urllib.request.Request(url, headers=headers or {"User-Agent": "Mozilla/5.0"})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -282,6 +285,8 @@ def _download_video(
     cancel_check: Callable[[], bool],
 ) -> Path:
     height = {"720": 720, "1080": 1080}.get(quality, 0)
+    # 优先 H.264：浏览器（尤其 Safari）对 AV1 支持不完整，而用户需要在页面内直接播放。
+    # 后面的 / 表示逐级回退，保证总有一个可用格式。
     if height:
         fmt = (
             f"bv*[height<={height}][vcodec^=avc1]+ba[ext=m4a]/"
@@ -453,6 +458,7 @@ def _make_cover(directory: Path, thumb_url: str, referer: str, video: Path | Non
 
 
 def _asset(path: Path, kind: str, title: str) -> dict:
+    """登记一个素材文件：扩展名、大小、MIME、下载文件名、视频分辨率。"""
     ext = path.suffix.lstrip(".").lower()
     size = path.stat().st_size
     info = {
@@ -508,6 +514,7 @@ def run_url(
     engine = ""
     language = ""
 
+    # 字幕路径最便宜：拿到就不需要 Whisper。失败则静默回退到音频转写。
     if options.get("prefer_subtitles", True):
         entry = subtitles.pick_subtitle(info)
         if entry:
@@ -534,6 +541,7 @@ def run_url(
     quality = options.get("quality", "720")
     direct_url = info.get("_direct_url") or ""
 
+    # 抖音/小红书走直链；B站/YouTube 交给 yt-dlp 合并音视频
     if direct_url:
         emit(10, "下载视频", "正在下载视频…")
         video_path = _download_direct(
@@ -586,6 +594,7 @@ def run_url(
         emit(51, "生成封面", "正在准备封面…")
     audio_source = audio_path or video_path
 
+    # 封面优先用平台图（需带 Referer），拿不到再从视频第 1 秒截一帧
     cover = _make_cover(
         assets_dir,
         source.get("thumbnail") or "",
@@ -761,6 +770,7 @@ def run_file(
 
 
 def _cleanup_temp(assets_dir: Path) -> None:
+    """只清理转写用的临时 WAV，保留视频/音频/封面三个可下载素材。"""
     for name in ("audio16k.wav",):
         try:
             (assets_dir / name).unlink(missing_ok=True)
@@ -774,7 +784,11 @@ def _cleanup_temp(assets_dir: Path) -> None:
 
 
 def friendly_error(exc: BaseException) -> tuple[str, str]:
-    """把底层异常翻译成中文提示。"""
+    """把底层异常翻译成中文提示。
+
+    yt-dlp / ffmpeg 的报错又长又偏英文，直接展示体验很差，
+    这里按常见错误归类，并给出下一步建议（例如导入 cookies）。
+    """
     if isinstance(exc, FriendlyError):
         return exc.message, exc.hint
     raw = str(exc).replace("ERROR: ", "").strip()

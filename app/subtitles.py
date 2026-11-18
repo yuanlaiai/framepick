@@ -76,6 +76,7 @@ def parse_srt(content: str) -> list[dict]:
 
 
 def _dedupe_cues(cues: list[dict]) -> list[dict]:
+    """清理平台滚动字幕：相邻 cue 经常整行重复或“上一句是下一句的前缀”。"""
     out: list[dict] = []
     for cue in cues:
         text = cue["text"].strip()
@@ -119,7 +120,10 @@ def _env_proxy() -> str | None:
 
 
 def pick_subtitle(info: dict) -> dict | None:
-    """优先人工中文字幕，其次自动中文字幕，再退到英文/其他。"""
+    """优先人工中文字幕，其次自动中文字幕，再退到英文/其他。
+
+    同语言下 VTT/SRT 比 json3 更好解析，排序时给一点格式加分。
+    """
     candidates: list[tuple[int, int, dict]] = []
 
     def add(tracks: dict, is_auto: int) -> None:

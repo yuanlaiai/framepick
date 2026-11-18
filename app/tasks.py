@@ -156,6 +156,8 @@ class TaskManager:
             if not task:
                 return None
             task.cancel_event.set()
+            # 排队中的任务直接标记取消，Worker 取出时会跳过；
+            # 正在运行的任务由 cancel_event 在 pipeline 的下一个检查点中断。
             if task.status == "queued":
                 task.status = "canceled"
                 task.stage = "已取消"
@@ -208,6 +210,8 @@ class TaskManager:
         config.COOKIES_FILE.unlink(missing_ok=True)
 
     # ---------- 工作线程 ----------
+    # 单 Worker 串行消费队列：Whisper 推理本身就会吃满 CPU/GPU，
+    # 并发只会让多个任务一起变慢，还容易触发平台风控。
     def _loop(self) -> None:
         while True:
             task_id = self._queue.get()
@@ -238,6 +242,7 @@ class TaskManager:
         task_dir = config.TASKS_DIR / task.id
         task_dir.mkdir(parents=True, exist_ok=True)
         try:
+            # 素材目录与任务 JSON 分开存：结果可持久化，临时音视频处理完即删
             if task.kind == "url":
                 result = pipeline.run_url(
                     task_id=task.id,

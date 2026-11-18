@@ -7,8 +7,9 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 APP_DIR = BASE_DIR / "app"
-STATIC_DIR = BASE_DIR / "static"
+STATIC_DIR = BASE_DIR / "web" / "dist"
 def _env(name: str, legacy: str, default: str) -> str:
+    """读取新变量名，兼容 1.0 之前的 VIDSCRIPT_* 旧名字。"""
     return os.environ.get(name) or os.environ.get(legacy) or default
 
 
@@ -20,6 +21,7 @@ THUMBS_DIR = DATA_DIR / "thumbs"
 COOKIES_FILE = DATA_DIR / "cookies.txt"
 CHROME_PROFILE_DIR = DATA_DIR / "chrome-profile"
 
+# 模型缓存：新目录不存在时复用旧版本目录，避免老用户重新下载几百 MB 模型
 _model_dir = Path(
     _env("FRAMEPICK_MODEL_DIR", "VIDSCRIPT_MODEL_DIR", str(Path.home() / ".cache" / "framepick-models"))
 )

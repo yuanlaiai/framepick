@@ -1,0 +1,144 @@
+@import "tailwindcss";
+
+/* 深色模式用 <html class="dark"> 控制，配合 useTheme 切换 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Noto Sans SC",
+    "Microsoft YaHei", "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    color-scheme: light;
+  }
+
+  /* 让原生播放器、滚动条等控件跟随深色模式 */
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-[#f5f6fb] font-sans text-slate-900 antialiased dark:bg-[#080a11] dark:text-slate-100;
+  }
+
+  ::selection {
+    background-color: rgb(99 102 241 / 0.22);
+  }
+
+  /* 细滚动条，避免结果区出现粗重的系统滚动条 */
+  * {
+    scrollbar-width: thin;
+  }
+}
+
+@layer components {
+  /* 毛玻璃面板：整站的主要容器 */
+  .panel {
+    @apply rounded-[22px] border border-slate-200/80 bg-white/75 shadow-[0_30px_60px_-34px_rgba(23,31,61,0.35)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-[0_40px_80px_-40px_rgba(0,0,0,0.85)];
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-[15px] bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 px-5 py-3.5 text-[15px] font-semibold text-white shadow-[0_16px_30px_-16px_rgba(99,102,241,0.95)] transition hover:-translate-y-px hover:shadow-[0_22px_38px_-16px_rgba(99,102,241,0.95)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-slate-200 bg-white px-3 py-1.5 text-[12.5px] font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800;
+  }
+
+  .link-btn {
+    @apply cursor-pointer rounded-lg px-1.5 py-1 text-[12.5px] font-medium text-indigo-500 transition hover:bg-indigo-500/10 dark:text-indigo-400;
+  }
+
+  .icon-btn {
+    @apply grid h-[38px] w-[38px] place-items-center rounded-[11px] text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100;
+  }
+}
+
+/* select 需要自定义下拉箭头，直接写 CSS 比 @apply 组合更清晰 */
+.select {
+  width: 100%;
+  appearance: none;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='m7 10 5 5 5-5' stroke='%238b94a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  padding: 8px 32px 8px 12px;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+  transition:
+    border-color 0.18s,
+    box-shadow 0.18s;
+}
+
+.select:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.1);
+}
+
+.dark .select {
+  border-color: #334155;
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: rise 0.35s ease both;
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.8s infinite;
+}
+
+/* 结果正文的滚动条 */
+article::-webkit-scrollbar {
+  width: 8px;
+}
+
+article::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+
+.dark article::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+/* 遵循系统「减少动态效果」设置 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}

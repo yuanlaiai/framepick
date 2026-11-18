@@ -4,5 +4,7 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 data/
+web/node_modules/
+web/.vite/
 *.log
 .DS_Store

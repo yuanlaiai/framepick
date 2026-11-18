@@ -81,7 +81,11 @@ def _launch(p):
 
 
 def _open_page(url: str, *, api_hints: tuple[str, ...] = (), wait_api_ms: int = 12000, wait_ms: int = 5000):
-    """打开页面，收集匹配 api_hints 的接口 JSON 响应。"""
+    """打开页面，收集匹配 api_hints 的接口 JSON 响应。
+
+    抖音/小红书的详情数据由页面 JS 带签名请求，直接 curl 接口会被风控。
+    这里让浏览器自己发请求，我们只旁路读取响应体，因此不需要登录态。
+    """
     if not chrome_available():
         raise FriendlyError(
             "解析抖音/小红书需要 Chrome",
@@ -140,7 +144,11 @@ def _open_page(url: str, *, api_hints: tuple[str, ...] = (), wait_api_ms: int = 
 
 
 def _dismiss_overlays(page) -> None:
-    """关掉登录弹窗/遮罩：抖音匿名访问会提示登录，但不影响取数据。"""
+    """关掉登录弹窗/遮罩。
+
+    抖音匿名访问会弹登录框，但详情接口在弹窗出现前就已经返回；
+    顺手关掉只是为了让页面继续播放、避免遮罩挡住后续操作。
+    """
     selectors = [
         '[data-e2e="login-close"]',
         ".dy-account-close",
@@ -237,6 +245,7 @@ def _date(ts: Any) -> str:
 
 
 def douyin_id(url: str) -> str | None:
+    """支持详情页链接与 v.douyin.com 短链（短链需要跟随 302）。"""
     match = DOUYIN_ID_RE.search(url)
     if match:
         return match.group(1)
@@ -258,6 +267,7 @@ def _pick_aweme(payloads: list[dict]) -> dict | None:
 
 
 def douyin_info(url: str) -> dict:
+    """抖音：直接从页面自己的 aweme/detail 响应里取完整视频信息。"""
     vid = douyin_id(url)
     if not vid:
         raise FriendlyError("没有识别出抖音视频 ID", "请粘贴视频详情页链接，或 App 里的分享链接。")
@@ -273,6 +283,7 @@ def douyin_info(url: str) -> dict:
             "没有拿到抖音视频信息",
             "页面已打开但没有拿到详情数据，请重试；若持续失败可在设置中导入 cookies。",
         )
+    # aweme_type 68/150 是图文/图集，没有可下载的视频流
     if aweme.get("aweme_type") in (68, 150) or not aweme.get("video"):
         raise FriendlyError("这是图文作品", "当前版本只支持抖音视频作品。")
 
@@ -372,6 +383,10 @@ def _note_video_url(note: dict) -> str:
 
 
 def xiaohongshu_info(url: str) -> dict:
+    """小红书：读取页面 SSR 的 __INITIAL_STATE__ 或 feed 接口。
+
+    分享链接里的 xsec_token 有时效，过期后需要用户重新复制分享链接。
+    """
     page_url = _fetch_redirect(url)
     match = XHS_ID_RE.search(page_url)
     note_id = match.group(1) if match else ""
@@ -380,6 +395,7 @@ def xiaohongshu_info(url: str) -> dict:
         api_hints=("v1/feed", "note_detail", "note_info"),
         wait_api_ms=8000,
     )
+    # 小红书对失效/无 token 的链接会返回「页面不见了」的空壳页
     if "你访问的页面不见了" in html or "页面不存在" in html:
         raise FriendlyError(
             "小红书链接已失效",

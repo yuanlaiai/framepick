@@ -18,7 +18,13 @@ def is_cjk(ch: str) -> bool:
 
 
 def normalize_punctuation(text: str) -> str:
-    """把紧邻中文的英文标点换成中文标点，并去掉中文字符之间的空格。"""
+    """把紧邻中文的英文标点换成中文标点，并去掉中文字符之间的空格。
+
+    规则：
+    - 只替换“挨着中文”的 ASCII 标点，避免破坏英文句子与数字（3.14、Mr.）；
+    - 全角标点前后不留空格；
+    - 连续标点（，，、。。。）合并，减少 ASR 抖动。
+    """
     chars = list(text)
     n = len(chars)
     for i, ch in enumerate(chars):
@@ -82,6 +88,7 @@ def collapse_loops(text: str) -> str:
 
 
 def dedupe_segments(segments: list[dict]) -> list[dict]:
+    """去掉 ASR 常见的完全重复句，以及滚动字幕造成的“上句是下句前缀”。"""
     out: list[dict] = []
     for seg in segments:
         text = clean_segment_text(seg.get("text", ""))
@@ -105,7 +112,10 @@ def dedupe_segments(segments: list[dict]) -> list[dict]:
 
 
 def _chunk_text(text: str, limit: int = 80) -> list[str]:
-    """把过长的识别片段按标点切成短句，便于阅读和生成字幕。"""
+    """把过长的识别片段按标点切成短句，便于阅读和生成字幕。
+
+    优先在句号/逗号处断开；窗口内找不到标点时按字符数硬切。
+    """
     chunks: list[str] = []
     rest = text.strip()
     while len(rest) > limit:
@@ -125,6 +135,7 @@ def _chunk_text(text: str, limit: int = 80) -> list[str]:
 
 
 def split_long_segments(segments: list[dict], limit: int = 60) -> list[dict]:
+    """Whisper 偶尔给出 20~30 秒的长片段，按字符比例分配时间轴后切短。"""
     out: list[dict] = []
     for seg in segments:
         text = seg["text"]
@@ -149,6 +160,7 @@ def split_long_segments(segments: list[dict], limit: int = 60) -> list[dict]:
 
 
 def build_paragraphs(segments: list[dict], max_chars: int = 120) -> list[dict]:
+    """把逐句片段合并成适合阅读的段落：句末标点 + 长度 + 静音间隔共同决定断点。"""
     paragraphs: list[dict] = []
     cur: dict | None = None
     for seg in segments:
