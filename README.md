@@ -20,6 +20,7 @@
   <img src="https://img.shields.io/badge/Tailwind-4-38bdf8?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 4">
   <img src="https://img.shields.io/badge/Whisper-faster--whisper-8b5cf6?style=flat-square" alt="faster-whisper">
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey?style=flat-square" alt="macOS / Linux">
+  <img src="https://img.shields.io/badge/docker-ready-2496ed?style=flat-square&logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/PRs-welcome-ec4899?style=flat-square" alt="PRs welcome">
 </p>
 
@@ -40,6 +41,7 @@
 
 - [功能](#功能)
 - [快速开始](#快速开始)
+- [Docker 部署](#docker-部署)
 - [使用](#使用)
 - [支持平台](#支持平台)
 - [工作原理](#工作原理)
@@ -70,6 +72,7 @@
 | 后端 | Python 3.10+ · FastAPI · yt-dlp · ffmpeg · faster-whisper |
 | 免登录解析 | Playwright + 本机 Chrome（抖音 / 小红书） |
 | 前端 | React 19 · TypeScript · Vite 8 · Tailwind CSS 4 |
+| 测试 | Vitest · Testing Library（17 个用例） |
 | 存储 | 本地 `data/`（任务 JSON + 素材文件），无数据库 |
 
 | 暗色 | 移动端 |
@@ -101,6 +104,7 @@ cd web
 npm install
 npm run dev      # http://127.0.0.1:5173，/api 自动代理到 8790
 npm run build    # 产出到 web/dist，FastAPI 直接托管
+npm test         # Vitest 单元/组件测试
 ```
 
 macOS 安装 ffmpeg：
@@ -118,6 +122,30 @@ PORT=8899 ./run.sh
 首次转写会自动下载 Whisper 模型（`small` 约 460 MB）到 `~/.cache/framepick-models`；国内网络会自动切换到 `hf-mirror.com` 镜像，也可以用 `HF_ENDPOINT` 指定。
 
 > Playwright 会直接使用系统已安装的 Chrome（`channel=chrome`），不需要额外执行 `playwright install`。如果 Chrome 不在默认路径，设置 `CHROME_BIN`。
+
+## Docker 部署
+
+镜像内已包含 ffmpeg、Chromium 和全部 Python 依赖，适合 NAS / 服务器长期运行：
+
+```bash
+docker compose up -d --build
+# 打开 http://127.0.0.1:8790
+```
+
+说明：
+
+- 素材、任务结果、cookies 和 Whisper 模型都放在 `./data`，容器重建不丢；
+- 首次转写会自动下载模型（约 460 MB），建议预留 4 GB 以上内存；
+- 抖音/小红书的免登录解析依赖镜像内的 Chromium，无需额外配置；
+- 抖音在部分容器网络下会触发风控（详情接口返回空），此时在设置里导入 cookies 即可；B站 / YouTube / 本地文件不受影响；
+- 改端口直接改 `docker-compose.yml` 的 `ports`，例如 `"8899:8790"`。
+
+也可以手动构建：
+
+```bash
+docker build -t framepick .
+docker run -d -p 8790:8790 -v "$PWD/data:/data" --name framepick framepick
+```
 
 ## 使用
 
@@ -192,6 +220,7 @@ framepick/
 │   │   ├── lib/         # API 封装、格式化、剪贴板
 │   │   ├── types.ts     # 与后端 API 对齐的类型
 │   │   └── App.tsx
+│   ├── src/test/        # Vitest 配置、样例数据与测试
 │   ├── public/          # logo 等静态资源
 │   └── dist/            # 构建产物（已提交，FastAPI 托管）
 ├── docs/              # Logo 与截图
@@ -271,6 +300,9 @@ curl -X POST http://127.0.0.1:8790/api/tasks \
 **改了前端代码但页面没变化？**
 前端不是热更新到 8790 的：开发时用 `cd web && npm run dev`（5173 端口，带代理）；改完要发布就 `npm run build`，然后刷新 8790。
 
+**Docker 里抖音解析失败？**
+先确认容器内 Chromium 可用：`docker compose exec framepick chromium --version`。若平台要求验证，仍可在设置里导入 cookies。
+
 **支持 Windows 吗？**
 代码未针对 Windows 做适配与测试，理论上可用（需要 ffmpeg 与 Chrome），欢迎提交 PR。
 
@@ -283,7 +315,7 @@ curl -X POST http://127.0.0.1:8790/api/tasks \
 - [ ] 批量链接 / 队列导入
 - [ ] AI 摘要与文案改写
 - [ ] 字幕翻译（双语 SRT）
-- [ ] Docker 镜像与桌面端打包
+- [x] Docker 镜像（桌面端打包仍在计划中）
 - [ ] Windows 适配
 
 ## 参与贡献

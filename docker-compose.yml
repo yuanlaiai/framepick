@@ -1,0 +1,12 @@
+services:
+  framepick:
+    build: .
+    image: framepick:latest
+    ports:
+      - "8790:8790"
+    volumes:
+      # 素材、任务结果、cookies 与模型都放在这里，容器重建不丢
+      - ./data:/data
+    environment:
+      TZ: Asia/Shanghai
+    restart: unless-stopped

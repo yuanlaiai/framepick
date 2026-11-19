@@ -36,6 +36,7 @@ pip install ruff
 | `app/platforms.py` | 链接识别与平台判断 |
 | `web/src/` | React 组件、hooks、API 封装 |
 | `web/dist/` | 前端构建产物（已提交，FastAPI 直接托管） |
+| `web/src/test/` | 测试样例数据与 jsdom 初始化 |
 
 ## 新增一个平台
 
@@ -54,6 +55,7 @@ cd web
 npm install
 npm run dev     # 5173 端口，/api 代理到 8790
 npm run build   # 产出 web/dist
+npm test        # Vitest（组件 + hooks + 工具函数）
 ```
 
 - 组件按区块拆分：`Extractor`（输入）、`ProgressPanel`、`ResultPanel`（结果）等；
@@ -72,6 +74,7 @@ npm run build   # 产出 web/dist
 
 - [ ] `ruff check app` 通过
 - [ ] `python -m compileall -q app` 通过
+- [ ] `cd web && npm test` 通过
 - [ ] 三种输入都验证：平台链接、本地视频、本地音频
 - [ ] 导出 TXT / SRT / MD / ZIP 正常
 - [ ] 抖音链接走通（Chrome 可用时）

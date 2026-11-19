@@ -60,15 +60,19 @@ def _fetch_redirect(url: str, timeout: float = 15.0) -> str:
 
 def _launch(p):
     chrome = _find_chrome()
-    kwargs: dict[str, Any] = {
-        "headless": True,
-        "args": [
-            "--autoplay-policy=no-user-gesture-required",
-            "--mute-audio",
-            "--disable-blink-features=AutomationControlled",
-            "--disable-background-networking",
-        ],
-    }
+    args = [
+        "--autoplay-policy=no-user-gesture-required",
+        "--mute-audio",
+        "--disable-blink-features=AutomationControlled",
+        "--disable-background-networking",
+        # Docker 默认 /dev/shm 只有 64MB，播放器初始化时容易崩
+        "--disable-dev-shm-usage",
+    ]
+    # 容器内以 root 运行 Chromium 必须关闭沙箱
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        args.append("--no-sandbox")
+
+    kwargs: dict[str, Any] = {"headless": True, "args": args}
     if chrome:
         kwargs["executable_path"] = chrome
     try:
@@ -80,7 +84,14 @@ def _launch(p):
         ) from exc
 
 
-def _open_page(url: str, *, api_hints: tuple[str, ...] = (), wait_api_ms: int = 12000, wait_ms: int = 5000):
+def _open_page(
+    url: str,
+    *,
+    api_hints: tuple[str, ...] = (),
+    wait_api_ms: int = 12000,
+    wait_ms: int = 5000,
+    ready=None,
+):
     """打开页面，收集匹配 api_hints 的接口 JSON 响应。
 
     抖音/小红书的详情数据由页面 JS 带签名请求，直接 curl 接口会被风控。
@@ -108,6 +119,25 @@ def _open_page(url: str, *, api_hints: tuple[str, ...] = (), wait_api_ms: int = 
             locale="zh-CN",
             timezone_id="Asia/Shanghai",
         )
+        # 反自动化检测：去掉 webdriver 标记，并让 UA Client Hints 显示为 Chrome。
+        # 没有这一步时，容器里的 Chromium 会被抖音弹滑块验证。
+        context.add_init_script(
+            """
+            try {
+              Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+              const brands = [
+                { brand: 'Google Chrome', version: '124' },
+                { brand: 'Chromium', version: '124' },
+                { brand: 'Not-A.Brand', version: '99' },
+              ];
+              Object.defineProperty(navigator, 'userAgentData', {
+                get: () => ({ brands, mobile: false, platform: 'macOS' }),
+              });
+            } catch (error) {
+              /* 旧浏览器没有 userAgentData，忽略即可 */
+            }
+            """
+        )
         page = context.new_page()
 
         def on_response(response) -> None:
@@ -127,8 +157,11 @@ def _open_page(url: str, *, api_hints: tuple[str, ...] = (), wait_api_ms: int = 
             browser.close()
             raise FriendlyError("页面打开失败", f"{str(exc)[:160]}，请稍后重试。") from exc
 
+        # 首个接口响应可能只是空壳，等到真正包含详情数据的响应再继续
         deadline = time.time() + wait_api_ms / 1000
-        while time.time() < deadline and not captured:
+        while time.time() < deadline:
+            if captured and (ready is None or ready(captured)):
+                break
             page.wait_for_timeout(300)
         _dismiss_overlays(page)
         page.wait_for_timeout(800)
@@ -275,7 +308,10 @@ def douyin_info(url: str) -> dict:
     html, payloads, _state = _open_page(
         page_url,
         api_hints=("aweme/detail", "aweme/v1/web/aweme"),
-        wait_api_ms=15000,
+        wait_api_ms=20000,
+        ready=lambda items: any(
+            isinstance(item, dict) and item.get("aweme_detail") for item in items
+        ),
     )
     aweme = _pick_aweme(payloads)
     if not aweme:
