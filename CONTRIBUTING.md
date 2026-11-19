@@ -5,7 +5,7 @@
 ## 开发环境
 
 ```bash
-git clone <repo-url> framepick
+git clone https://github.com/yuanlaiai/framepick.git
 cd framepick
 
 python3.13 -m venv .venv

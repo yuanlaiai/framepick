@@ -13,6 +13,11 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/yuanlaiai/framepick/actions/workflows/ci.yml"><img src="https://github.com/yuanlaiai/framepick/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/yuanlaiai/framepick"><img src="https://img.shields.io/github/stars/yuanlaiai/framepick?style=flat-square" alt="GitHub stars"></a>
+</p>
+
+<p align="center">
   <a href="README.en.md">English</a> · 简体中文
 </p>
 
@@ -91,8 +96,8 @@
 
 ```bash
 # 1. 获取代码
-git clone https://github.com/<your-name>/framepick.git
-cd framepick   # 把 <your-name> 换成你的 GitHub 用户名
+git clone https://github.com/yuanlaiai/framepick.git
+cd framepick
 
 # 2. 创建虚拟环境并安装依赖
 python3.13 -m venv .venv

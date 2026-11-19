@@ -47,7 +47,7 @@ Douyin (抖音) and Xiaohongshu (小红书) are parsed through a local headless 
 Requirements: macOS or Linux, Python 3.10+, `ffmpeg`/`ffprobe`, and Google Chrome (for Douyin/Xiaohongshu).
 
 ```bash
-git clone https://github.com/<your-name>/framepick.git
+git clone https://github.com/yuanlaiai/framepick.git
 cd framepick
 
 python3.13 -m venv .venv
