@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import subprocess
 import time
 import urllib.request
@@ -96,6 +97,8 @@ def _ydl_info(url: str, opts: dict) -> dict:
 
 def fetch_info(url: str, retry_with_proxy: bool = True) -> dict:
     platform_key, _label = platforms.detect_platform(url)
+    if platform_key == "xiaohongshu":
+        url = scrapers.normalize_xiaohongshu_url(url)
     if platform_key == "douyin":
         # yt-dlp 的抖音提取器强依赖 cookies；直接用本机浏览器解析分享页
         return scrapers.douyin_info(url)
@@ -109,6 +112,9 @@ def fetch_info(url: str, retry_with_proxy: bool = True) -> dict:
         if platform_key == "xiaohongshu":
             try:
                 return scrapers.xiaohongshu_info(url)
+            except FriendlyError as scrape_exc:
+                # 浏览器解析给出的中文原因比 yt-dlp 的 Unsupported URL 更有用
+                raise scrape_exc
             except Exception as scrape_exc:  # noqa: BLE001
                 log.info("xhs scrape failed: %s", scrape_exc)
         proxy = _proxy() if retry_with_proxy else None
@@ -151,9 +157,15 @@ def _pick_source(info: dict, url: str, platform_key: str, platform_label: str) -
     description = (info.get("description") or "").strip()
     if description in {"-", "—", "–", "无", "暂无", "暂无简介", "暂无描述", "."}:
         description = ""
+    title = (info.get("title") or "未命名视频").strip()
+    # yt-dlp 的小红书提取器只会给 "XiaoHongShu video #id"，用正文首行当标题更好读
+    if title.lower().startswith("xiaohongshu video") and description:
+        title = description.splitlines()[0][:80]
+    if not tags and description:
+        tags = re.findall(r"#([^#\s]+)", description)[:20]
     return {
         "url": info.get("webpage_url") or url,
-        "title": (info.get("title") or "未命名视频").strip(),
+        "title": title,
         "uploader": info.get("uploader") or info.get("channel") or info.get("creator") or "",
         "thumbnail": thumb or "",
         "duration": float(info.get("duration") or info.get("duration_float") or 0),
@@ -499,6 +511,8 @@ def run_url(
     cancel_check: Callable[[], bool],
 ) -> dict:
     started = time.time()
+    # RedNote 链接先映射到小红书主站，yt-dlp 与浏览器解析都只认主站
+    url = scrapers.normalize_xiaohongshu_url(url)
     platform_key, platform_label = platforms.detect_platform(url)
     assets_dir = config.ASSETS_DIR / task_id
     assets_dir.mkdir(parents=True, exist_ok=True)

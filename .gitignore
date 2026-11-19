@@ -9,3 +9,4 @@ web/.vite/
 *.log
 .DS_Store
 coverage/
+.idea/

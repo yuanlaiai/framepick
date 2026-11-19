@@ -13,6 +13,10 @@
 </p>
 
 <p align="center">
+  <a href="README.en.md">English</a> · 简体中文
+</p>
+
+<p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-6366f1?style=flat-square" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-3b82f6?style=flat-square" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square" alt="FastAPI">
@@ -32,7 +36,9 @@
 
 **帧采**把一条视频分享链接拆成可以复用的素材：视频、音轨、封面、发布文案、语音转写，外加一份信息表。所有处理都在本机完成：下载、转码、逐句转写、导出，不经过第三方 API，也不需要账号。
 
-抖音、小红书通过本机 Chrome 匿名解析——**登录弹窗会自动关掉，不用扫码也不用 cookies**；B站、YouTube、TikTok 走 yt-dlp；本地文件拖进去同样能出音频、封面和文字稿。
+抖音、小红书通过本机 Chrome 匿名解析——**登录弹窗会自动关掉，不用扫码**；B站、YouTube、TikTok 走 yt-dlp；RedNote（rednote.com）链接会自动映射回小红书主站。本地文件拖进去同样能出音频、封面和文字稿。
+
+> **项目状态**：早期版本，接口和配置仍可能调整；遇到平台改版请提 Issue，欢迎 PR。
 
 > **名字的由来**：帧 = 视频的每一帧，采 = 采集素材与文字；合起来读起来也像“精彩”。
 > FramePick = 从一段视频里，取走你真正需要的东西。
@@ -97,7 +103,7 @@ pip install -r requirements.txt
 ./run.sh                            # 默认 http://127.0.0.1:8790
 ```
 
-仓库已包含构建好的 `web/dist`，所以启动不需要 Node。改前端时再进 `web/`：
+仓库已包含构建好的 `web/dist`，所以启动不需要 Node。改前端时再进 `web/`（Node 24+）：
 
 ```bash
 cd web
@@ -176,11 +182,12 @@ https://www.youtube.com/watch?v=jNQXAC9IVRw
 | B站 | ✅ | 视频/音频/封面/文案；1080P 高码率可能需要 cookies |
 | YouTube | ✅ | 优先平台字幕；网络不通时自动尝试系统代理 |
 | TikTok | ✅ | 取决于所在地区网络 |
-| 小红书 | ✅ | 需要 App 分享链接里的 `xsec_token`（链接有时效） |
+| 小红书 | ✅ | 优先走 yt-dlp，失败时用 Chrome 渲染；带 `xsec_token` 的链接更稳 |
+| RedNote（rednote.com） | ⚠️ | 会自动映射到小红书主站；映射失败说明该笔记仅国际版可见，需要导入 cookies |
 | 快手 / 视频号 | ⚠️ | 实验性，部分链接可能失败 |
 | 本地文件 | ✅ | 最稳定，自动生成 MP3 与封面截帧 |
 
-图文笔记（小红书图集）暂不支持，遇到会给出明确提示。
+图文笔记（小红书图集）暂不支持，遇到会给出明确提示。RedNote 的登录页/404 也会转成可执行的中文提示，不再显示“暂不支持这个链接”。
 
 ## 工作原理
 
@@ -285,8 +292,13 @@ curl -X POST http://127.0.0.1:8790/api/tasks \
 **抖音提示“Fresh cookies ... needed”？**
 这是 yt-dlp 的限制；本项目已绕开 yt-dlp，改用 Chrome 读取页面接口，无需 cookies。
 
-**小红书解析失败？**
-小红书分享链接带 `xsec_token` 且有时效，过期后请重新从 App 分享一次；只贴 `/explore/{id}` 通常打不开。
+**小红书 / RedNote 解析失败？**
+- `rednote.com` 链接会自动换成 `xiaohongshu.com/explore/{id}` 再解析；如果该笔记只在国际版可见，就会落到登录页，需要导入 cookies；
+- 小红书分享链接的 `xsec_token` 有时效，过期后请重新从 App 分享；
+- 只贴 `/explore/{id}` 且页面提示不可访问时，请使用 App 里的完整分享文案。
+
+**导入的 cookies 会被用在哪里？**
+抖音/小红书的无头浏览器会自动带上你在设置里导入的 cookies；所以 RedNote 登录态、B站会员视频等场景也能复用同一份 cookies。
 
 **视频下载失败但文案成功？**
 部分平台限制视频流（登录 / 会员 / DRM），此时仍可拿到音频与文案；可切换清晰度或导入 cookies 重试。

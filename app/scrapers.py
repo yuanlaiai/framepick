@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 import html as html_lib
+import logging
 import os
 import re
 import shutil
@@ -17,7 +18,12 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from urllib.parse import parse_qs, quote, urlparse
+
+from . import config
 from .errors import FriendlyError
+
+log = logging.getLogger("framepick.scrapers")
 
 UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -56,6 +62,43 @@ def _fetch_redirect(url: str, timeout: float = 15.0) -> str:
             return resp.geturl() or url
     except Exception:
         return url
+
+
+def _load_cookies() -> list[dict]:
+    """把用户在设置里导入的 Netscape cookies 注入浏览器，用于 RedNote 等需要登录的场景。"""
+    path = config.COOKIES_FILE
+    if not path.exists() or path.stat().st_size == 0:
+        return []
+    cookies: list[dict] = []
+    try:
+        lines = path.read_text("utf-8").splitlines()
+    except OSError:
+        return []
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split("\t")
+        if len(parts) != 7:
+            continue
+        domain, _flag, cpath, secure, expires, name, value = parts
+        cookie = {
+            "name": name,
+            "value": value,
+            "domain": domain,
+            "path": cpath or "/",
+            "secure": secure.upper() == "TRUE",
+            "httpOnly": False,
+            "sameSite": "Lax",
+        }
+        try:
+            exp = int(float(expires))
+            if exp > 0:
+                cookie["expires"] = exp
+        except ValueError:
+            pass
+        cookies.append(cookie)
+    return cookies
 
 
 def _launch(p):
@@ -121,6 +164,12 @@ def _open_page(
         )
         # 反自动化检测：去掉 webdriver 标记，并让 UA Client Hints 显示为 Chrome。
         # 没有这一步时，容器里的 Chromium 会被抖音弹滑块验证。
+        cookies = _load_cookies()
+        if cookies:
+            try:
+                context.add_cookies(cookies)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("注入 cookies 失败：%s", exc)
         context.add_init_script(
             """
             try {
@@ -418,25 +467,43 @@ def _note_video_url(note: dict) -> str:
     return ""
 
 
-def xiaohongshu_info(url: str) -> dict:
-    """小红书：读取页面 SSR 的 __INITIAL_STATE__ 或 feed 接口。
+def normalize_xiaohongshu_url(url: str) -> str:
+    """把 rednote.com 链接映射到 xiaohongshu.com 的同一条笔记。
 
-    分享链接里的 xsec_token 有时效，过期后需要用户重新复制分享链接。
+    RedNote 国际版页面经常强制登录，而小红书主站对同一条笔记通常可直接访问；
+    yt-dlp 的 XiaoHongShu 提取器也只认 xiaohongshu.com 域名。
     """
-    page_url = _fetch_redirect(url)
-    match = XHS_ID_RE.search(page_url)
-    note_id = match.group(1) if match else ""
+    parsed = urlparse(url)
+    if not (parsed.hostname or "").endswith("rednote.com"):
+        return url
+    match = XHS_ID_RE.search(url)
+    if not match:
+        return url
+    token = (parse_qs(parsed.query).get("xsec_token") or [""])[0]
+    normalized = f"https://www.xiaohongshu.com/explore/{match.group(1)}"
+    if token:
+        normalized += f"?xsec_token={quote(token)}&xsec_source=pc_share"
+    return normalized
+
+
+def _xhs_from_page(page_url: str, *, allow_rednote_hint: bool, has_token: bool) -> dict:
+    """渲染单个小红书笔记页并解析；失败时抛出带中文提示的 FriendlyError。"""
     html, payloads, state = _open_page(
         page_url,
         api_hints=("v1/feed", "note_detail", "note_info"),
         wait_api_ms=8000,
     )
-    # 小红书对失效/无 token 的链接会返回「页面不见了」的空壳页
-    if "你访问的页面不见了" in html or "页面不存在" in html:
+    if allow_rednote_hint and ("登录 - rednote" in html or "登录后推荐更懂你的笔记" in html):
         raise FriendlyError(
-            "小红书链接已失效",
-            "笔记可能被删除，或分享 token 已过期。请在 App 里重新复制分享链接（带 xsec_token）后再试。",
+            "RedNote 要求登录",
+            "rednote.com 的笔记页跳转到了登录页。请改用小红书（xiaohongshu.com）分享链接，或在设置里导入 cookies。",
         )
+    if "你访问的页面不见了" in html or "页面不存在" in html or "当前笔记暂时无法浏览" in html:
+        raise FriendlyError(
+            "小红书笔记暂不可访问",
+            "笔记可能被删除、仅自己可见或地区受限。请在 App 里重新分享，或改用带 xsec_token 的链接。",
+        )
+
     note = _find_note(state)
     if not note:
         for payload in payloads:
@@ -444,10 +511,16 @@ def xiaohongshu_info(url: str) -> dict:
             if note:
                 break
     if not note:
+        if not has_token:
+            raise FriendlyError(
+                "链接缺少 xsec_token",
+                "页面没有返回笔记数据。请在 App 里点「分享 → 复制链接」，或直接粘贴完整分享文案。",
+            )
         raise FriendlyError(
             "小红书页面解析失败",
             "页面没有返回笔记数据。请确认链接来自 App 分享（带 xsec_token），且没有过期。",
         )
+
     video_url = _note_video_url(note)
     if not video_url:
         raise FriendlyError("这是小红书图文笔记", "当前版本只处理视频笔记，图片笔记暂不支持。")
@@ -467,9 +540,9 @@ def xiaohongshu_info(url: str) -> dict:
         duration = round(float(capa.get("duration") or 0), 2)
     except (TypeError, ValueError):
         duration = 0.0
-    title = note.get("title") or desc[:40] or note_id
+    title = note.get("title") or desc[:40] or "小红书笔记"
     return {
-        "id": note_id,
+        "id": note.get("noteId") or "",
         "title": title,
         "description": desc,
         "uploader": user.get("nickname") or "",
@@ -488,3 +561,34 @@ def xiaohongshu_info(url: str) -> dict:
         "_direct_url": video_url,
         "_headers": {"User-Agent": UA, "Referer": "https://www.xiaohongshu.com/"},
     }
+
+
+def xiaohongshu_info(url: str) -> dict:
+    """小红书：读取页面 SSR 的 __INITIAL_STATE__ 或 feed 接口。
+
+    分享链接里的 xsec_token 有时效，过期后需要重新复制分享链接。
+    rednote.com 是国际版域名，经常跳登录页；这里会先把同一条笔记
+    映射到 xiaohongshu.com/explore/{id} 再尝试，失败才提示登录。
+    """
+    parsed = urlparse(url)
+    is_rednote = (parsed.hostname or "").endswith("rednote.com")
+    match = XHS_ID_RE.search(url)
+    note_id = match.group(1) if match else ""
+    token = (parse_qs(parsed.query).get("xsec_token") or [""])[0]
+
+    candidates: list[tuple[str, bool]] = []
+    if is_rednote and note_id:
+        cn_url = f"https://www.xiaohongshu.com/explore/{note_id}"
+        if token:
+            cn_url += f"?xsec_token={quote(token)}&xsec_source=pc_share"
+        candidates.append((cn_url, False))
+    candidates.append((_fetch_redirect(url), is_rednote))
+
+    last_error: FriendlyError | None = None
+    for page_url, allow_rednote_hint in candidates:
+        try:
+            return _xhs_from_page(page_url, allow_rednote_hint=allow_rednote_hint, has_token=bool(token))
+        except FriendlyError as exc:  # noqa: PERF203
+            last_error = exc
+            log.info("xhs candidate failed (%s): %s", page_url[:60], exc.message)
+    raise last_error or FriendlyError("小红书解析失败", "请稍后重试。")

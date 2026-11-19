@@ -13,6 +13,7 @@ PLATFORM_RULES: list[tuple[re.Pattern[str], str, str]] = [
     (re.compile(r"(^|\.)youtube\.com$|(^|\.)youtu\.be$"), "youtube", "YouTube"),
     (re.compile(r"(^|\.)tiktok\.com$"), "tiktok", "TikTok"),
     (re.compile(r"(^|\.)xiaohongshu\.com$|(^|\.)xhslink\.com$"), "xiaohongshu", "小红书"),
+    (re.compile(r"(^|\.)rednote\.com$"), "xiaohongshu", "小红书"),
     (re.compile(r"(^|\.)kuaishou\.com$|(^|\.)chenzhongtech\.com$"), "kuaishou", "快手"),
     (re.compile(r"(^|\.)weibo\.com$|(^|\.)weibo\.cn$"), "weibo", "微博"),
     (re.compile(r"(^|\.)twitter\.com$|(^|\.)x\.com$"), "twitter", "X"),
