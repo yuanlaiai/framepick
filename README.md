@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
-    <img src="docs/logo.svg" width="360" alt="帧采 FramePick">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg?v=2">
+    <img src="docs/logo.svg?v=2" width="320" alt="帧采 FramePick">
   </picture>
 </p>
 
